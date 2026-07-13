@@ -1,0 +1,52 @@
+# ============================================================
+# 01 — Basic GitLab Pipeline
+# The simplest possible real pipeline.
+# ============================================================
+
+# Define the stages in execution order.
+# Jobs in the same stage run IN PARALLEL.
+# GitLab waits for all jobs in a stage to pass before moving to the next.
+stages:
+  - build
+  - test
+  - deploy
+
+# The Docker image every job will use UNLESS overridden.
+default:
+  image: alpine:3.19
+
+# ── STAGE: build ──────────────────────────────────────────
+build-app:
+  stage: build
+  script:
+    - echo "Building the application..."
+    - echo "Build ID is $CI_PIPELINE_ID"
+    - echo "Branch is $CI_COMMIT_REF_NAME"
+    - mkdir -p dist
+    - echo "build output" > dist/app.txt
+    - echo "Build complete."
+
+# ── STAGE: test ───────────────────────────────────────────
+test-unit:
+  stage: test
+  script:
+    - echo "Running unit tests..."
+    - echo "All tests passed."
+
+test-lint:
+  stage: test                 # Same stage as test-unit — runs in PARALLEL
+  script:
+    - echo "Running linter..."
+    - echo "No lint errors found."
+
+# ── STAGE: deploy ─────────────────────────────────────────
+deploy-staging:
+  stage: deploy
+  script:
+    - echo "Deploying to staging environment..."
+    - echo "Deployed commit $CI_COMMIT_SHORT_SHA"
+  environment:
+    name: staging
+  # Only run on the main branch — not on feature branches
+  only:
+    - main

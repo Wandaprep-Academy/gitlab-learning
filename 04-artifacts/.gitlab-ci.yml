@@ -1,0 +1,101 @@
+# ============================================================
+# 04 — Artifacts and Cache
+# Demonstrates passing build output between jobs, report
+# artifacts (JUnit), and caching dependencies.
+# ============================================================
+
+stages:
+  - install
+  - build
+  - test
+  - package
+
+default:
+  image: node:20-alpine
+
+# ── Cache: reuse node_modules across pipeline runs ────────
+# The cache key includes the package-lock.json checksum so
+# the cache is automatically invalidated when deps change.
+cache:
+  key:
+    files:
+      - package-lock.json          # Invalidate cache when lockfile changes
+  paths:
+    - node_modules/
+  policy: pull-push                # Download cache at job start, upload at end
+
+# ── STAGE: install ────────────────────────────────────────
+install-deps:
+  stage: install
+  script:
+    - echo "Installing npm dependencies (or restoring from cache)..."
+    - npm ci --silent || echo "(no package.json present — simulating)"
+    - echo "Dependencies ready."
+
+# ── STAGE: build ──────────────────────────────────────────
+build-app:
+  stage: build
+  script:
+    - echo "Building application..."
+    - mkdir -p dist
+    - echo '{"name":"my-app","version":"1.0.0","commit":"'$CI_COMMIT_SHORT_SHA'"}' > dist/app.json
+    - echo "console.log('Hello from build');" > dist/main.js
+    - echo "Build complete. Files in dist/:"
+    - ls -la dist/
+  artifacts:
+    name: "build-$CI_COMMIT_SHORT_SHA"    # Descriptive artifact name
+    paths:
+      - dist/                              # Upload this folder as an artifact
+    expire_in: 7 days                      # Auto-delete after 7 days
+    when: always                           # Upload even if script fails
+
+# ── STAGE: test ───────────────────────────────────────────
+test-with-junit-report:
+  stage: test
+  needs:
+    - job: build-app
+      artifacts: true               # Download dist/ artifact from build-app
+  script:
+    - echo "Running tests..."
+    - echo "Checking build artifact is present:"
+    - cat dist/app.json
+    - echo "Generating JUnit XML report..."
+    - mkdir -p reports
+    - |
+      cat > reports/junit.xml << XMLEOF
+      <?xml version="1.0" encoding="UTF-8"?>
+      <testsuite name="unit-tests" tests="3" failures="0" time="1.234">
+        <testcase name="should render homepage" classname="HomeTest" time="0.412"/>
+        <testcase name="should validate input" classname="ValidationTest" time="0.321"/>
+        <testcase name="should calculate total" classname="CalculatorTest" time="0.501"/>
+      </testsuite>
+      XMLEOF
+    - echo "All tests passed."
+  artifacts:
+    reports:
+      junit: reports/junit.xml      # GitLab parses this and shows tests in MR tab
+    paths:
+      - reports/
+    expire_in: 30 days
+
+# ── STAGE: package ────────────────────────────────────────
+create-release-package:
+  stage: package
+  needs:
+    - job: build-app
+      artifacts: true               # Need the dist/ folder from build
+    - job: test-with-junit-report
+      artifacts: false              # Need test to have passed, but not its files
+  script:
+    - echo "Creating release package..."
+    - apk add --no-cache zip
+    - zip -r release-$CI_COMMIT_SHORT_SHA.zip dist/
+    - echo "Package created:"
+    - ls -lh release-*.zip
+  artifacts:
+    name: "release-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - "release-*.zip"
+    expire_in: 30 days
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'

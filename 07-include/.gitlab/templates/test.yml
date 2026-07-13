@@ -1,0 +1,26 @@
+# .gitlab/templates/test.yml
+# LOCAL include: - lives in the same repository.
+
+.test-base:
+  stage: test
+  needs:
+    - job: build-application
+      artifacts: true    # Download dist/ from the build job
+
+unit-tests:
+  extends: .test-base
+  script:
+    - echo "Running unit tests against dist/build-info.json..."
+    - cat dist/build-info.json
+    - echo "All tests passed."
+  artifacts:
+    reports:
+      junit: reports/junit.xml
+    when: always
+
+integration-tests:
+  extends: .test-base
+  script:
+    - echo "Running integration tests..."
+    - echo "Integration tests passed."
+  allow_failure: false

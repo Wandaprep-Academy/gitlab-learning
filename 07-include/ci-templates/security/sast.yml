@@ -1,0 +1,21 @@
+# ci-templates/security/sast.yml
+# Reusable SAST (Static Application Security Testing) job.
+# Uses GitLab's official SAST template internally.
+# Projects include this file to get SAST without any configuration.
+
+include:
+  - template: Security/SAST.gitlab-ci.yml   # GitLab built-in SAST template
+
+# Override SAST variables for your organisation's standards
+variables:
+  SAST_EXCLUDED_PATHS: "spec, test, tests, tmp, node_modules, .m2"
+  SAST_EXCLUDED_ANALYZERS: ""
+  SEARCH_MAX_DEPTH: 4
+
+# Extend the built-in sast job to add your org's stage + rules
+sast:
+  stage: quality
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_MERGE_REQUEST_ID'
+  allow_failure: true

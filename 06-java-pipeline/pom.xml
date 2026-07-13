@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.example.training</groupId>
+  <artifactId>simple-java-app</artifactId>
+  <version>${revision}</version>
+  <packaging>jar</packaging>
+
+  <name>Simple Java App — GitLab CI/CD Training</name>
+  <description>Minimal Java app used to demonstrate a GitLab Maven pipeline.</description>
+
+  <properties>
+    <revision>1.0.${CI_PIPELINE_IID}</revision>   <!-- Uses GitLab variable for version -->
+    <java.version>17</java.version>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!-- SonarQube -->
+    <sonar.projectKey>simple-java-app</sonar.projectKey>
+    <sonar.qualitygate.wait>true</sonar.qualitygate.wait>
+  </properties>
+
+  <dependencies>
+    <!-- JUnit 5 for testing -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>5.10.1</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- Run tests -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.2.3</version>
+      </plugin>
+
+      <!-- Create a fat JAR with all dependencies -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <version>3.6.0</version>
+        <configuration>
+          <archive>
+            <manifest>
+              <mainClass>com.example.training.Main</mainClass>
+            </manifest>
+          </archive>
+          <descriptorRefs>
+            <descriptorRef>jar-with-dependencies</descriptorRef>
+          </descriptorRefs>
+        </configuration>
+        <executions>
+          <execution>
+            <id>make-assembly</id>
+            <phase>package</phase>
+            <goals><goal>single</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- SonarQube analysis -->
+      <plugin>
+        <groupId>org.sonarsource.scanner.maven</groupId>
+        <artifactId>sonar-maven-plugin</artifactId>
+        <version>3.10.0.2594</version>
+      </plugin>
+    </plugins>
+  </build>
+
+  <!-- Nexus deployment repository — credentials come from settings.xml -->
+  <distributionManagement>
+    <repository>
+      <id>nexus-releases</id>
+      <name>Nexus Release Repository</name>
+      <url>${env.NEXUS_URL}/repository/maven-releases/</url>
+    </repository>
+    <snapshotRepository>
+      <id>nexus-snapshots</id>
+      <name>Nexus Snapshot Repository</name>
+      <url>${env.NEXUS_URL}/repository/maven-snapshots/</url>
+    </snapshotRepository>
+  </distributionManagement>
+
+</project>

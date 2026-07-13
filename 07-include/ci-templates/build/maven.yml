@@ -1,0 +1,39 @@
+# ci-templates/build/maven.yml
+# Reusable Maven compile + package job.
+
+variables:
+  MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+  MAVEN_CLI_OPTS: "--batch-mode --errors --fail-at-end"
+
+cache:
+  key:
+    files:
+      - pom.xml
+  paths:
+    - .m2/repository/
+
+.maven-base:
+  image: maven:3.9-eclipse-temurin-17
+  before_script:
+    - mvn --version
+
+maven-compile:
+  extends: .maven-base
+  stage: compile
+  script:
+    - mvn $MAVEN_CLI_OPTS compile
+  artifacts:
+    paths: [target/classes/]
+    expire_in: 1 hour
+
+maven-package:
+  extends: .maven-base
+  stage: package
+  script:
+    - mvn $MAVEN_CLI_OPTS package -DskipTests
+    - ls -lh target/*.jar
+  artifacts:
+    name: "$CI_PROJECT_NAME-$CI_COMMIT_SHORT_SHA"
+    paths: [target/*.jar]
+    exclude: [target/original-*.jar]
+    expire_in: 30 days

@@ -1,0 +1,20 @@
+# ci-templates/test/lint.yml
+# Reusable linting job — non-blocking by default.
+
+.lint-base:
+  stage: test
+  allow_failure: true    # Lint warnings don't block the pipeline
+
+lint-yaml:
+  extends: .lint-base
+  image: cytopia/yamllint:latest
+  script:
+    - yamllint .gitlab-ci.yml
+    - echo "YAML linting complete."
+
+lint-dockerfile:
+  extends: .lint-base
+  image: hadolint/hadolint:latest-alpine
+  script:
+    - hadolint Dockerfile
+    - echo "Dockerfile linting complete."

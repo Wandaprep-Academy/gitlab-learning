@@ -1,0 +1,87 @@
+# ============================================================
+# 05 — Terraform GitLab Pipeline
+# Production-grade: validate → plan (with MR widget) → manual apply
+# Uses S3 backend with DynamoDB state locking.
+# ============================================================
+
+image:
+  name: hashicorp/terraform:1.7
+  entrypoint: [""]           # Override entrypoint so GitLab can run any command
+
+variables:
+  TF_IN_AUTOMATION: "true"   # Suppresses prompts in non-interactive mode
+  TF_CLI_ARGS_init: >-
+    -backend-config="bucket=${TF_STATE_BUCKET}"
+    -backend-config="key=${CI_PROJECT_NAME}/${TF_VAR_environment}/terraform.tfstate"
+    -backend-config="region=${AWS_DEFAULT_REGION}"
+    -backend-config="dynamodb_table=${TF_LOCK_TABLE}"
+    -backend-config="encrypt=true"
+
+stages:
+  - validate
+  - plan
+  - apply
+
+# ── Shared init step — reused via YAML anchors ────────────
+.init: &init
+  before_script:
+    - terraform --version
+    - terraform init $TF_CLI_ARGS_init
+  cache:
+    key: "${CI_PROJECT_PATH}-${TF_VAR_environment}"
+    paths:
+      - .terraform/
+      - .terraform.lock.hcl
+    policy: pull-push
+
+# ── STAGE: validate ───────────────────────────────────────
+validate:
+  stage: validate
+  <<: *init
+  script:
+    - terraform validate
+    - terraform fmt --check --recursive
+  rules:
+    - if: '$CI_MERGE_REQUEST_ID'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# ── STAGE: plan ───────────────────────────────────────────
+plan:
+  stage: plan
+  <<: *init
+  script:
+    - terraform plan
+        -var="environment=${TF_VAR_environment}"
+        -out=tfplan
+    - terraform show -json tfplan > plan.json
+    - echo "Plan complete. Inspect the plan artifact before approving apply."
+  artifacts:
+    name: "tfplan-${CI_COMMIT_SHORT_SHA}-${TF_VAR_environment}"
+    paths:
+      - tfplan          # Binary plan — used by apply job
+      - plan.json       # JSON plan — used by GitLab MR widget
+    expire_in: 7 days
+    reports:
+      terraform: plan.json    # Shows plan summary directly in the Merge Request
+  rules:
+    - if: '$CI_MERGE_REQUEST_ID'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# ── STAGE: apply ──────────────────────────────────────────
+apply:
+  stage: apply
+  <<: *init
+  script:
+    - echo "Applying Terraform plan..."
+    - terraform apply -auto-approve tfplan
+    - echo "Apply complete."
+    - terraform output
+  needs:
+    - job: plan
+      artifacts: true     # Download the tfplan binary from plan job
+  environment:
+    name: $TF_VAR_environment
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual        # Requires a human to click "play" in the GitLab UI
+      allow_failure: false

@@ -1,0 +1,91 @@
+# ============================================================
+# 03 — CI/CD Variables
+# Shows predefined variables, inline variables, conditional
+# logic using variables, and how to reference secrets safely.
+# ============================================================
+
+# Inline variables — visible in the .yml, not sensitive
+variables:
+  APP_NAME: "my-application"
+  APP_VERSION: "1.2.0"
+  BUILD_TARGET: "linux/amd64"
+  DEPLOY_TIMEOUT: "120"
+
+stages:
+  - info
+  - conditional
+  - secret-demo
+
+# ── STAGE: info ───────────────────────────────────────────
+print-predefined-vars:
+  stage: info
+  image: alpine:3.19
+  script:
+    - echo "=== Predefined GitLab CI Variables ==="
+    - echo "Pipeline ID    : $CI_PIPELINE_ID"
+    - echo "Job ID         : $CI_JOB_ID"
+    - echo "Commit SHA     : $CI_COMMIT_SHORT_SHA"
+    - echo "Branch / Tag   : $CI_COMMIT_REF_NAME"
+    - echo "Project Name   : $CI_PROJECT_NAME"
+    - echo "Runner         : $CI_RUNNER_DESCRIPTION"
+    - echo "Triggered by   : $GITLAB_USER_LOGIN"
+    - echo ""
+    - echo "=== Inline Variables from .gitlab-ci.yml ==="
+    - echo "App Name       : $APP_NAME"
+    - echo "App Version    : $APP_VERSION"
+    - echo "Build Target   : $BUILD_TARGET"
+
+# ── STAGE: conditional ────────────────────────────────────
+# Use variables in rules: to control job execution
+only-on-main:
+  stage: conditional
+  image: alpine:3.19
+  script:
+    - echo "This job runs ONLY on the main branch."
+    - echo "Current branch is $CI_COMMIT_BRANCH"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
+    - when: never
+
+only-on-tag:
+  stage: conditional
+  image: alpine:3.19
+  script:
+    - echo "This job runs ONLY when a git tag is pushed."
+    - echo "Tag name is $CI_COMMIT_TAG"
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: always
+    - when: never
+
+always-except-main:
+  stage: conditional
+  image: alpine:3.19
+  script:
+    - echo "This job runs on ALL branches EXCEPT main."
+    - echo "Useful for feature branch checks."
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: never
+    - when: always
+
+# ── STAGE: secret-demo ────────────────────────────────────
+# IMPORTANT: Set DATABASE_PASSWORD in Project → Settings → CI/CD → Variables
+# Mark it as: Protected=yes, Masked=yes
+use-secret-variable:
+  stage: secret-demo
+  image: alpine:3.19
+  script:
+    - echo "Connecting to database..."
+    # The variable value is masked in logs — shown as [MASKED]
+    - echo "Password from project variable: $DATABASE_PASSWORD"
+    - echo "Notice the password above is masked in the GitLab UI."
+    - |
+      if [ -z "$DATABASE_PASSWORD" ]; then
+        echo "WARNING: DATABASE_PASSWORD is not set."
+        echo "Go to: Project → Settings → CI/CD → Variables"
+        echo "Add DATABASE_PASSWORD as a masked, protected variable."
+      else
+        echo "SUCCESS: DATABASE_PASSWORD is configured."
+      fi

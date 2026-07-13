@@ -1,0 +1,35 @@
+# ci-templates/deploy/ssh-deploy.yml
+# Base SSH deploy job — extend this rather than copying SSH setup everywhere.
+# Projects inherit the SSH agent setup; they only need to define the script:.
+
+.ssh-deploy-base:
+  image: alpine:3.19
+  before_script:
+    - apk add --no-cache openssh-client
+    - eval $(ssh-agent -s)
+    - echo "$DEPLOY_SSH_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+  after_script:
+    - echo "Deploy job finished for environment: $CI_ENVIRONMENT_NAME"
+
+# Staging — automatic on main
+.deploy-staging-base:
+  extends: .ssh-deploy-base
+  stage: deploy
+  environment:
+    name: staging
+    url: http://$DEPLOY_HOST:8080
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# Production — manual gate on tag push
+.deploy-production-base:
+  extends: .ssh-deploy-base
+  stage: deploy
+  environment:
+    name: production
+    url: http://$DEPLOY_HOST
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: manual

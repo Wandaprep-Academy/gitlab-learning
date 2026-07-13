@@ -1,0 +1,36 @@
+<!-- settings.xml
+     Store the CONTENTS of this file as a GitLab CI/CD FILE variable
+     named MAVEN_SETTINGS_XML.
+
+     GitLab will write it to disk during the pipeline and Maven
+     will pick it up via -s $MAVEN_SETTINGS_XML.
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+          http://maven.apache.org/xsd/settings-1.0.0.xsd">
+
+  <servers>
+    <!-- These IDs must match the <id> tags in pom.xml distributionManagement -->
+    <server>
+      <id>nexus-releases</id>
+      <username>${env.NEXUS_USERNAME}</username>
+      <password>${env.NEXUS_PASSWORD}</password>
+    </server>
+    <server>
+      <id>nexus-snapshots</id>
+      <username>${env.NEXUS_USERNAME}</username>
+      <password>${env.NEXUS_PASSWORD}</password>
+    </server>
+  </servers>
+
+  <mirrors>
+    <!-- Route all artifact downloads through Nexus (optional) -->
+    <mirror>
+      <id>nexus-central</id>
+      <mirrorOf>central</mirrorOf>
+      <url>${env.NEXUS_URL}/repository/maven-central/</url>
+    </mirror>
+  </mirrors>
+
+</settings>

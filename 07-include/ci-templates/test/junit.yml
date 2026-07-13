@@ -1,0 +1,18 @@
+# ci-templates/test/junit.yml
+# Reusable Maven test job with JUnit report.
+
+.junit-test-base:
+  image: maven:3.9-eclipse-temurin-17
+  script:
+    - mvn $MAVEN_CLI_OPTS test
+  artifacts:
+    reports:
+      junit: target/surefire-reports/TEST-*.xml
+    paths:
+      - target/surefire-reports/
+    expire_in: 30 days
+    when: always    # Upload test report even when tests fail
+
+maven-test:
+  extends: .junit-test-base
+  stage: test

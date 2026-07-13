@@ -1,0 +1,54 @@
+# ============================================================
+# 07 — include: Composing Pipelines from Reusable Templates
+#
+# This file shows all four include: types in one pipeline.
+# Rather than defining every job here, we pull in template
+# files and compose a complete pipeline from them.
+# ============================================================
+
+# ── Stage order (must be defined here, not in templates) ─────
+stages:
+  - build
+  - test
+  - quality
+  - deploy
+  - notify
+
+# ── Global variables ──────────────────────────────────────────
+variables:
+  APP_VERSION: "2.1.0"
+  DEPLOY_HOST: "app.example.com"
+
+# ── include: — all four types demonstrated ───────────────────
+include:
+  # 1. local: — files in THIS repository
+  #    Use for project-specific templates you control directly
+  - local: .gitlab/templates/build.yml
+  - local: .gitlab/templates/test.yml
+  - local: .gitlab/templates/deploy.yml
+
+  # 2. project: — files in ANOTHER GitLab repository
+  #    Use for organisation-wide shared templates
+  #    (In this training repo the files are inside ci-templates/ to simulate this)
+  - project: org/shared-ci-templates    # Replace with your real shared repo
+    ref: main                            # Pin to a branch, tag, or commit SHA
+    file: /ci-templates/notify/slack.yml
+
+  # 3. remote: — any publicly accessible HTTPS URL
+  #    Use for third-party templates or company internal CDN
+  # - remote: https://raw.githubusercontent.com/org/templates/main/ci/lint.yml
+
+  # 4. template: — GitLab's own built-in template library
+  #    Use for official GitLab-maintained CI features
+  - template: Security/SAST.gitlab-ci.yml
+
+# ── Overrides and additions specific to THIS project ─────────
+# The templates above define most jobs. Here we only define
+# what is unique to this project — keeping this file minimal.
+
+# Override just the script: from the template — everything else is inherited
+build-application:
+  script:
+    - echo "Project-specific build step..."
+    - mkdir -p dist
+    - echo "{ \"app\": \"$APP_NAME\", \"version\": \"$APP_VERSION\" }" > dist/build-info.json
