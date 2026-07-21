@@ -1,2 +1,0 @@
-# gitlab-learning
-Everything GitLab
