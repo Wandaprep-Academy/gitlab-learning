@@ -10,77 +10,117 @@ stages:
   - deploy
 
 default:
-  image: node:20-alpine
-  # before_script at default level runs for EVERY job unless overridden
-  before_script:
-    - echo "=== Job starting on Runner: $CI_RUNNER_DESCRIPTION ==="
-    - echo "=== Pipeline: $CI_PIPELINE_ID | Commit: $CI_COMMIT_SHORT_SHA ==="
+  tags:
+    - aws
 
-# ── STAGE: build ──────────────────────────────────────────
+  # Runs before every job unless the job overrides it.
+  before_script:
+    - 'echo "Job starting on Runner: ${CI_RUNNER_DESCRIPTION}"'
+    - 'echo "Pipeline: ${CI_PIPELINE_ID} | Commit: ${CI_COMMIT_SHORT_SHA}"'
+
+# ── STAGE: build ───────────────────────────────────────────
 build:
   stage: build
-  before_script:           # Overrides the default before_script for this job only
-    - echo "Installing build dependencies..."
-    - npm ci --silent || echo "(no package.json — skipping)"
+
+  # Overrides the default before_script for this job.
+  before_script:
+    - 'echo "Installing build dependencies..."'
+    - |
+      if [ -f package.json ]; then
+        npm ci --silent
+      else
+        echo "No package.json found — skipping npm install."
+      fi
+
   script:
-    - echo "Compiling application..."
+    - 'echo "Compiling application..."'
     - mkdir -p dist
-    - echo "{ "version": "1.0.0", "commit": "$CI_COMMIT_SHORT_SHA" }" > dist/build-info.json
-    - echo "Build artifact written to dist/build-info.json"
-  after_script:            # Runs even if script: fails
-    - echo "Build job finished. Cleaning up temp files."
+    - |
+      printf '{"version":"1.0.0","commit":"%s"}\n' \
+        "${CI_COMMIT_SHORT_SHA}" > dist/build-info.json
+    - 'echo "Build artifact written to dist/build-info.json"'
+    - cat dist/build-info.json
+
+  # Runs even when the main script fails.
+  after_script:
+    - 'echo "Build job finished. Cleaning up temporary files."'
+
   artifacts:
     paths:
       - dist/
     expire_in: 1 hour
 
-# ── STAGE: test ───────────────────────────────────────────
+# ── STAGE: test ────────────────────────────────────────────
 test-unit:
   stage: test
-  needs: [build]           # Run as soon as 'build' passes, don't wait for others in 'build' stage
+
+  # Downloads artifacts from the build job.
+  needs:
+    - job: build
+      artifacts: true
+
   script:
-    - echo "Running unit tests..."
-    - echo "Checking dist/build-info.json exists from build job:"
+    - 'echo "Running unit tests..."'
+    - 'echo "Checking that dist/build-info.json exists:"'
+    - test -f dist/build-info.json
     - cat dist/build-info.json
-    - echo "All 47 unit tests passed."
+    - 'echo "All 47 unit tests passed."'
 
 test-integration:
   stage: test
   script:
-    - echo "Running integration tests (slower)..."
+    - 'echo "Running integration tests..."'
     - sleep 2
-    - echo "Integration tests passed."
+    - 'echo "Integration tests passed."'
 
 test-lint:
   stage: test
-  allow_failure: true      # Lint issues warn but don't break the pipeline
-  script:
-    - echo "Running code style checks..."
-    - echo "Warning: 2 minor style issues found (non-blocking)."
-    - exit 1               # Fails, but allow_failure:true means pipeline continues
+  allow_failure: true
 
-# ── STAGE: deploy ─────────────────────────────────────────
+  script:
+    - 'echo "Running code-style checks..."'
+    - 'echo "Warning: 2 minor style issues found — non-blocking."'
+    - exit 1
+
+# ── STAGE: deploy ──────────────────────────────────────────
 deploy-staging:
   stage: deploy
+
+  needs:
+    - job: build
+      artifacts: true
+    - job: test-unit
+    - job: test-integration
+    - job: test-lint
+
   script:
-    - echo "Deploying to STAGING environment..."
-    - echo "Version: $(cat dist/build-info.json)"
+    - 'echo "Deploying to STAGING environment..."'
+    - 'echo "Build information:"'
+    - cat dist/build-info.json
+
   environment:
     name: staging
     url: https://staging.example.com
+
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'   # Only deploy staging on main branch
-    - if: '$CI_MERGE_REQUEST_ID'           # Or on Merge Request pipelines
-      when: never
+    # Run only for direct pipelines on the main branch.
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "merge_request_event"'
+      when: on_success
+    - when: never
 
 deploy-production:
   stage: deploy
+
   script:
-    - echo "Deploying to PRODUCTION environment..."
-    - echo "Deployed $CI_COMMIT_TAG to production."
+    - 'echo "Deploying to PRODUCTION environment..."'
+    - 'echo "Deployed tag ${CI_COMMIT_TAG} to production."'
+
   environment:
     name: production
     url: https://www.example.com
+
   rules:
-    - if: '$CI_COMMIT_TAG'                 # Only run when a git tag is pushed
-      when: manual                         # AND requires a human to click "play"
+    # Available as a manual job only when a Git tag is pushed.
+    - if: '$CI_COMMIT_TAG'
+      when: manual
+    - when: never
