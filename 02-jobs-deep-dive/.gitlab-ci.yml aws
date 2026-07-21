@@ -1,3 +1,10 @@
+# ============================================================
+# 02 — Jobs Deep Dive
+# Demonstrates before_script, after_script, rules, needs,
+# allow_failure, and the manual deployment gate pattern.
+# Runner: Amazon Linux 2023 (Shell Executor)
+# ============================================================
+
 stages:
   - build
   - test
@@ -8,8 +15,8 @@ default:
     - aws
   # before_script at default level runs for EVERY job unless overridden
   before_script:
-    - echo "=== Job starting on Runner: $CI_RUNNER_DESCRIPTION ==="
-    - echo "=== Pipeline: $CI_PIPELINE_ID | Commit: $CI_COMMIT_SHORT_SHA ==="
+    - 'echo "=== Job starting on Runner: $CI_RUNNER_DESCRIPTION ==="'
+    - 'echo "=== Pipeline: $CI_PIPELINE_ID | Commit: $CI_COMMIT_SHORT_SHA ==="'
 
 # ── STAGE: build ──────────────────────────────────────────
 build:
@@ -20,8 +27,10 @@ build:
   script:
     - echo "Compiling application..."
     - mkdir -p dist
-    - echo "{ \"version\": \"1.0.0\", \"commit\": \"$CI_COMMIT_SHORT_SHA\" }" > dist/build-info.json
-    - echo "Build artifact written to dist/build-info.json"
+    - 'echo "{ \"version\": \"1.0.0\", \"commit\": \"$CI_COMMIT_SHORT_SHA\" }" > dist/build-info.json'
+    - zip -j dist/build-artifact.zip dist/build-info.json
+    - echo "Build artifact written to dist/build-artifact.zip"
+    - ls -lh dist/
   after_script:            # Runs even if script: fails
     - echo "Build job finished. Cleaning up temp files."
   artifacts:
@@ -32,11 +41,13 @@ build:
 # ── STAGE: test ───────────────────────────────────────────
 test-unit:
   stage: test
-  needs: [build]           # Run as soon as 'build' passes, don't wait for others in 'build' stage
+  needs: [build]           # Run as soon as 'build' passes
   script:
     - echo "Running unit tests..."
-    - echo "Checking dist/build-info.json exists from build job:"
-    - cat dist/build-info.json
+    - echo "Checking build artifacts..."
+    - ls -lh dist/
+    - unzip -l dist/build-artifact.zip
+    - unzip -p dist/build-artifact.zip build-info.json
     - echo "All 47 unit tests passed."
 
 test-integration:
@@ -51,7 +62,7 @@ test-lint:
   allow_failure: true      # Lint issues warn but don't break the pipeline
   script:
     - echo "Running code style checks..."
-    - echo "Warning: 2 minor style issues found (non-blocking)."
+    - 'echo "Warning: 2 minor style issues found (non-blocking)."'
     - exit 1               # Fails, but allow_failure:true means pipeline continues
 
 # ── STAGE: deploy ─────────────────────────────────────────
@@ -59,7 +70,7 @@ deploy-staging:
   stage: deploy
   script:
     - echo "Deploying to STAGING environment..."
-    - echo "Version: $(cat dist/build-info.json)"
+    - unzip -p dist/build-artifact.zip build-info.json
   environment:
     name: staging
     url: https://staging.example.com
