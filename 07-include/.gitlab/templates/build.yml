@@ -1,25 +1,26 @@
 # .gitlab/templates/build.yml
-# LOCAL include: - lives in the same repository.
+# LOCAL include - lives in the same repository.
 # Included by the root .gitlab-ci.yml via:
-#   include:
-#     - local: .gitlab/templates/build.yml
+#
+# include:
+#   - local: .gitlab/templates/build.yml
 
-# Hidden job (dot prefix) — acts as a base; not executed directly
+# Hidden job (template)
 .build-base:
   stage: build
   before_script:
     - echo "=== Build job starting ==="
-    - echo "Commit : $CI_COMMIT_SHORT_SHA"
-    - echo "Branch : $CI_COMMIT_REF_NAME"
-    - echo "Runner : $CI_RUNNER_DESCRIPTION"
+    - echo "Commit $CI_COMMIT_SHORT_SHA"
+    - echo "Bran
+    - echo "Runner $CI_ch $CI_COMMIT_REF_NAME"RUNNER_DESCRIPTION"
 
-# Real job that extends the base
+# Actual build job
 build-application:
   extends: .build-base
   script:
     - echo "Building application..."
     - mkdir -p dist
-    - echo "{ \"commit\": \"$CI_COMMIT_SHORT_SHA\", \"version\": \"$APP_VERSION\" }" > dist/build-info.json
+    - 'echo "{\"commit\"\"$CI_COMMIT_SHORT_SHA\",\"version\"\"$APP_VERSION\"}" > dist/build-info.json'
     - echo "Build complete."
   artifacts:
     name: "build-$CI_COMMIT_SHORT_SHA"
