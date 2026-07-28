@@ -11,8 +11,8 @@
   before_script:
     - echo "=== Build job starting ==="
     - echo "Commit $CI_COMMIT_SHORT_SHA"
-    - echo "Bran
-    - echo "Runner $CI_ch $CI_COMMIT_REF_NAME"RUNNER_DESCRIPTION"
+    - echo "Branch $CI_COMMIT_REF_NAME"
+    - echo "Runner  $CI_RUNNER_DESCRIPTION"
 
 # Actual build job
 build-application:
